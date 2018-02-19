@@ -4,7 +4,7 @@
 :)
 
 (: imports :)
-import module namespace cob = 'http://cob.net/ns' at 'modules/escape.xqm';
+import module namespace cob = 'http://cob.net/escape' at 'modules/escape.xqm';
 import module namespace functx = 'http://www.functx.com';
 
 
