@@ -3,6 +3,7 @@ module namespace to-mods = "http://cob.net/to-mods";
 import module namespace functx = "http://www.functx.com";
 (: namespaces :)
 declare namespace mods = "http://www.loc.gov/mods/v3";
+declare namespace etd = "http://www.ndltd.org/standards/etdms/1.1";
 declare namespace bp = "http://www.bepress.com/products/digital-commons";
 
 (: variables :)
@@ -32,8 +33,8 @@ declare function to-mods:dispatch( $nodes as node()* ) as item()* {
       case element(disciplines) return to-mods:passthru($node)
       case element(discipline) return to-mods:discipline($node)
       case element(abstract) return to-mods:abstract($node)
-      case element(publication-date) return to-mods:pub-date($node)
-      case element(submission-date) return to-mods:sub-date($node)
+      (:case element(publication-date) return to-mods:pub-date($node)
+      case element(submission-date) return to-mods:sub-date($node):)
 
 
       default return to-mods:passthru($node)
@@ -78,7 +79,7 @@ declare function to-mods:author( $node as node()* ) as item()* {
 
 declare function to-mods:advisor( $node as node()* ) as item()* {
   <mods:name>
-    <mods:displayForm>{to-mods:dispatch($node/node())}</mods:displayForm>
+    <mods:displayForm>{$node/value/text()}</mods:displayForm>
     <mods:role>
       <mods:roleTerm type="text" authority="marcrelator" valueURI="http://id.loc.gov/vocabulary/relators/ths">Thesis advisor</mods:roleTerm>
     </mods:role>
@@ -103,24 +104,24 @@ declare function to-mods:title( $node as node()* ) as item()* {
   </mods:titleInfo>
 };
 
-declare function to-mods:discipline( $node as node()* ) as item()* {
+declare function to-mods:discipline( $node as node()* ) as element()* {
   <mods:subject><mods:topic>{$node/data()}</mods:topic></mods:subject>
 };
 
-declare function to-mods:abstract( $node as node()* ) as item()* {
+declare function to-mods:abstract( $node as node()* ) as element()* {
   <mods:abstract>{$node/data()}</mods:abstract>
 };
 
 declare function to-mods:pub-date( $node as node()* ) as element()* {
-  <mods:dateIssued keyDate="yes" encoding="edtf">{functx:substring-before-match($node/node(), '-[0-9]{2}T')}</mods:dateIssued>
+  <mods:dateIssued keyDate="yes" encoding="edtf">{functx:substring-before-match($node/publication-date/text(), '-[0-9]{2}T')}</mods:dateIssued>
 };
 
 declare function to-mods:sub-date( $node as node()* ) as element()* {
-  <mods:dateCreated encoding="w3cdtf">{$node/node()}</mods:dateCreated>
+  <mods:dateCreated encoding="w3cdtf">{$node/submission-date/text()}</mods:dateCreated>
 };
 
 declare function to-mods:extension( $node as node()* ) as element()* {
-  if (fn:starts-with($node/node(), 'utk_grad'))
+  if (fn:starts-with($node/submission-path/text(), 'utk_grad'))
   then
     <mods:extension>
       <etd:degree>
