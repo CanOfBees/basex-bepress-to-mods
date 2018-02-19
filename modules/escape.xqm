@@ -5,9 +5,9 @@
 : A function for processing text(), stripping embedded HTML
 :)
 
-module namespace cob = "http://cob.net/ns";
+module namespace escape = "http://cob.net/escape";
 
-declare function cob:escape($text-in as xs:string) as xs:string
+declare function escape:escape($text-in as xs:string) as xs:string
 {
   if (fn:contains($text-in, '&lt;'))
   then (if (fn:contains($text-in, '&lt;a'))

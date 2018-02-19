@@ -1,75 +1,133 @@
-(:~
- : User: bridger
- : Date: 11/7/17
- : Time: 9:29 PM
- :
- :)
+module namespace to-mods = "http://cob.net/to-mods";
 
+import module namespace functx = "http://www.functx.com";
 (: namespaces :)
-module namespace to-mods = "to-mods";
-
 declare namespace mods = "http://www.loc.gov/mods/v3";
 declare namespace bp = "http://www.bepress.com/products/digital-commons";
 
-(: imports :)
-import module namespace esc = "http://cob.net/ns/esc" at "modules/escape.xqm";
+(: variables :)
+declare variable $to-mods:c-date := fn:format-dateTime(fn:current-dateTime(), '[Y]-[M,2]-[D,2]T[H]:[m]:[s][Z]');
 
-(: primary function :)
+(:~
+ : dispatch function for recursively processing and converting bepress metadata.xml to MODS xml
+ :
+ : @param nodes
+ :)
 declare function to-mods:dispatch( $nodes as node()* ) as item()* {
   for $node in $nodes
   return
     typeswitch($node)
-      case text() return $node
-      case element(bp:documents) return to-mods:pass($node)
-      case element(bp:document) return to-mods:mods($node)
-      case element(bp:submission-path) return to-mods:identifier($node)
-      case element(bp:authors) return to-mods:pass($node)
-      case element(bp:author) return to-mods:au-name($node)
+      (: case text() return fn:normalize-space($node) :)
+      case element(documents) return to-mods:passthru($node)
+      case element(document) return to-mods:document($node)
+      case element(submission-path) return to-mods:submission-path($node)
+      case element(authors) return to-mods:passthru($node)
+      case element(author) return to-mods:author($node)
+      case element(fields) return to-mods:passthru($node)
+      case element(field) return (
+        if ($node/@name = 'advisor1') then to-mods:advisor($node) else
+        if ($node/@name = 'advisor2') then to-mods:committee-mem($node) else ()
+      )
+      case element(title) return to-mods:title($node)
+      case element(disciplines) return to-mods:passthru($node)
+      case element(discipline) return to-mods:discipline($node)
+      case element(abstract) return to-mods:abstract($node)
+      case element(publication-date) return to-mods:pub-date($node)
+      case element(submission-date) return to-mods:sub-date($node)
 
-      default return to-mods:pass($node)
+
+      default return to-mods:passthru($node)
 };
 
-(: passthru function :)
-declare function to-mods:pass( $nodes as node()* ) as item()* {
-  for $node in $nodes
-  return
-    typeswitch($node)
-      case element(bp:documents) return to-mods:pass($node/node())
-      case element(bp:authors) return to-mods:pass($node/node())
-      default return to-mods:dispatch($node/node())
+(:~
+ : passthru function 
+ :)
+declare function to-mods:passthru( $node as node()* ) as item()* {
+  to-mods:dispatch($node/node())
 };
 
-(: start our new MODS record serialization :)
-declare function to-mods:mods( $node as node()* ) as item()* {
-  <mods:mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" version="3.5"
-  xmlns:xlink="http://www.w3c.org/1999/xlink" xmlns:etd="http://www.ndltd.org/standards/etdms/1.1"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-5.xsd">
+(: begin the MODS serialization process :)
+declare function to-mods:document( $node as node()* ) as item()* {
+  <mods:mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" version="3.5" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:etd="http://www.ndltd.org/standards/etdms/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-5.xsd">
     {to-mods:dispatch($node/node())}
+    <mods:originInfo>
+      {to-mods:sub-date($node)}
+      {to-mods:pub-date($node)}
+    </mods:originInfo>
+    <mods:typeOfResource>text</mods:typeOfResource>
+    {to-mods:extension($node)}
   </mods:mods>
 };
 
-(: mods:identifier[@type='local'] :)
-declare function to-mods:identifier( $node as node()* ) as item()* {
-  <mods:identifier type="local">{to-mods:dispatch($node/node())}</mods:identifier>
+(: convert bp:submission-path to mods:identifier :)
+declare function to-mods:submission-path( $node as node()* ) as item()* {
+  <mods:identifier type="local">{$node/node()}</mods:identifier>
 };
 
-(: mods:name :)
-declare function to-mods:au-name( $node as node()* ) as item()* {
-  let $au-name-fam := $node/bp:lname/text()
-  let $au-name-giv := if ($node/bp:mname)
-                    then ($node/bp:fname/text() || ' ' || $node/bp:mname/text())
-                    else ($node/bp:fname/text())
-  let $au-name-suf := $node/bp:suffix/text()
+(: convert bp:author(s) to mods:name[roleTerm='Author'] :)
+declare function to-mods:author( $node as node()* ) as item()* {
+  <mods:name>
+    <mods:namePart type="given">{$node/fname/text()}</mods:namePart>
+    <mods:namePart type="family">{$node/lname/text()}</mods:namePart>
+    {if ($node/terms) then <mods:namePart type="terms of address">{$node/terms/text()}</mods:namePart> else ()}
+    <mods:role>
+      <mods:roleTerm type="text" authority="marcrelator" valueURI="http://id.loc.gov/vocbulary/relators/aut">Author</mods:roleTerm>
+    </mods:role>
+  </mods:name>
+};
+
+declare function to-mods:advisor( $node as node()* ) as item()* {
+  <mods:name>
+    <mods:displayForm>{to-mods:dispatch($node/node())}</mods:displayForm>
+    <mods:role>
+      <mods:roleTerm type="text" authority="marcrelator" valueURI="http://id.loc.gov/vocabulary/relators/ths">Thesis advisor</mods:roleTerm>
+    </mods:role>
+  </mods:name>
+};
+
+declare function to-mods:committee-mem( $node as node()* ) as item()* {
+  for $mems in $node/value
+  let $mem := fn:tokenize($mems, ',')
   return
     <mods:name>
-      <mods:namePart type="family">{$au-name-fam}</mods:namePart>
-      <mods:namePart type="given">{$au-name-giv}</mods:namePart>
-      {if ($au-name-suf)
-       then <mods:namePart type="termsOfAddress">{$au-name-suf}</mods:namePart>
-       else ()}
+      <mods:displayForm>{$mem}</mods:displayForm>
       <mods:role>
-        <mods:roleTerm authority="marcrelator" valueURI="http://id.loc.gov/vocabulary/relators/aut">Author</mods:roleTerm>
+        <mods:roleTerm authority="local">Committee member</mods:roleTerm>
       </mods:role>
     </mods:name>
+};
+
+declare function to-mods:title( $node as node()* ) as item()* {
+  <mods:titleInfo>
+    <mods:title>{$node/data()}</mods:title>
+  </mods:titleInfo>
+};
+
+declare function to-mods:discipline( $node as node()* ) as item()* {
+  <mods:subject><mods:topic>{$node/data()}</mods:topic></mods:subject>
+};
+
+declare function to-mods:abstract( $node as node()* ) as item()* {
+  <mods:abstract>{$node/data()}</mods:abstract>
+};
+
+declare function to-mods:pub-date( $node as node()* ) as element()* {
+  <mods:dateIssued keyDate="yes" encoding="edtf">{functx:substring-before-match($node/node(), '-[0-9]{2}T')}</mods:dateIssued>
+};
+
+declare function to-mods:sub-date( $node as node()* ) as element()* {
+  <mods:dateCreated encoding="w3cdtf">{$node/node()}</mods:dateCreated>
+};
+
+declare function to-mods:extension( $node as node()* ) as element()* {
+  if (fn:starts-with($node/node(), 'utk_grad'))
+  then
+    <mods:extension>
+      <etd:degree>
+        <etd:name></etd:name>
+        <etd:discipline></etd:discipline>
+        <etd:grantor>University of Tennessee</etd:grantor>
+      </etd:degree>
+    </mods:extension>
+  else ()
 };
