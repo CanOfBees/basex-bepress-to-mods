@@ -47,7 +47,10 @@ declare function to-mods:passthru( $node as node()* ) as item()* {
   to-mods:dispatch($node/node())
 };
 
-(: begin the MODS serialization process :)
+(:~
+ : begin the MODS serialization process
+ : @param $node processes the 'document' node
+ :)
 declare function to-mods:document( $node as node()* ) as item()* {
   <mods:mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" version="3.5" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:etd="http://www.ndltd.org/standards/etdms/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-5.xsd">
     {to-mods:dispatch($node/node())}
@@ -66,7 +69,7 @@ declare function to-mods:submission-path( $node as node()* ) as item()* {
 };
 
 (: convert bp:author(s) to mods:name[roleTerm='Author'] :)
-declare function to-mods:author( $node as node()* ) as item()* {
+declare function to-mods:author( $node as node()* ) as element()* {
   <mods:name>
     <mods:namePart type="given">{$node/fname/text()}</mods:namePart>
     <mods:namePart type="family">{$node/lname/text()}</mods:namePart>
@@ -77,7 +80,7 @@ declare function to-mods:author( $node as node()* ) as item()* {
   </mods:name>
 };
 
-declare function to-mods:advisor( $node as node()* ) as item()* {
+declare function to-mods:advisor( $node as node()* ) as element()* {
   <mods:name>
     <mods:displayForm>{$node/value/text()}</mods:displayForm>
     <mods:role>
@@ -86,7 +89,7 @@ declare function to-mods:advisor( $node as node()* ) as item()* {
   </mods:name>
 };
 
-declare function to-mods:committee-mem( $node as node()* ) as item()* {
+declare function to-mods:committee-mem( $node as node()* ) as element()* {
   for $mems in $node/value
   let $mem := fn:tokenize($mems, ',')
   return
@@ -98,7 +101,7 @@ declare function to-mods:committee-mem( $node as node()* ) as item()* {
     </mods:name>
 };
 
-declare function to-mods:title( $node as node()* ) as item()* {
+declare function to-mods:title( $node as node()* ) as element()* {
   <mods:titleInfo>
     <mods:title>{$node/data()}</mods:title>
   </mods:titleInfo>
@@ -121,14 +124,18 @@ declare function to-mods:sub-date( $node as node()* ) as element()* {
 };
 
 declare function to-mods:extension( $node as node()* ) as element()* {
-  if (fn:starts-with($node/submission-path/text(), 'utk_grad'))
-  then
-    <mods:extension>
-      <etd:degree>
-        <etd:name></etd:name>
-        <etd:discipline></etd:discipline>
-        <etd:grantor>University of Tennessee</etd:grantor>
-      </etd:degree>
-    </mods:extension>
-  else ()
+  let $degree-name := $node/fields/field[@name='degree_name']/value/text()
+  let $dept-name := $node/fields/field[@name='department']/value/text()
+  return
+    if (fn:starts-with($node/submission-path/text(), 'utk_grad'))
+    then (
+      <mods:extension>
+        <etd:degree>
+          <etd:name>{$degree-name}</etd:name>
+          <etd:discipline>{$dept-name}</etd:discipline>
+          <etd:grantor>University of Tennessee</etd:grantor>
+        </etd:degree>
+      </mods:extension>,
+      <mods:genre authority="lcgft" valueURI="http://id.loc.gov/authorities/genreForms/gf2014026039">Academic theses</mods:genre>
+    ) else ()
 };
