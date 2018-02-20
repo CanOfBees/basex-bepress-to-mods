@@ -33,9 +33,6 @@ declare function to-mods:dispatch( $nodes as node()* ) as item()* {
       case element(disciplines) return to-mods:passthru($node)
       case element(discipline) return to-mods:discipline($node)
       case element(abstract) return to-mods:abstract($node)
-      (:case element(publication-date) return to-mods:pub-date($node)
-      case element(submission-date) return to-mods:sub-date($node):)
-
 
       default return to-mods:passthru($node)
 };
