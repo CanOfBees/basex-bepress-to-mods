@@ -57,6 +57,7 @@ declare function to-mods:document( $node as node()* ) as item()* {
     </mods:originInfo>
     <mods:typeOfResource>text</mods:typeOfResource>
     {to-mods:extension($node)}
+    {to-mods:genre($node)}
   </mods:mods>
 };
 
@@ -135,4 +136,16 @@ declare function to-mods:extension( $node as node()* ) as element()* {
       </mods:extension>,
       <mods:genre authority="lcgft" valueURI="http://id.loc.gov/authorities/genreForms/gf2014026039">Academic theses</mods:genre>
     ) else ()
+};
+
+declare function to-mods:genre( $node as node()* ) as element()* {
+  let $title := $node/publication-title/text()
+  return
+    if (matches($title, 'Doctoral Dissertations'))
+    then (
+      <mods:genre authority="coar" valueURI="http://purl.org/coar/resource_type/c_db06">doctoral thesis</mods:genre>
+    ) else if (matches($title, 'Masters Theses'))
+      then (
+        <mods:genre authority="coar" valueURI="http://purl.org/coar/resource_type/c_bdcc">masters thesis</mods:genre>
+      ) else ()
 };
