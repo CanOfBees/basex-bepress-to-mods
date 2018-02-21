@@ -14,43 +14,52 @@ declare variable $to-mods:c-date := fn:format-dateTime(fn:current-dateTime(), '[
  :
  : @param nodes
  :)
-declare function to-mods:dispatch( $nodes as node()* ) as item()* {
+declare function to-mods:dispatch(
+  $nodes as node()*,
+  $path as item()*
+) as item()* {
   for $node in $nodes
   return
     typeswitch($node)
       (: case text() return fn:normalize-space($node) :)
-      case element(documents) return to-mods:passthru($node)
-      case element(document) return to-mods:document($node)
+      case element(documents) return to-mods:passthru($node, $path)
+      case element(document) return to-mods:document($node, $path)
       case element(submission-path) return to-mods:submission-path($node)
-      case element(authors) return to-mods:passthru($node)
+      case element(authors) return to-mods:passthru($node, $path)
       case element(author) return to-mods:author($node)
-      case element(fields) return to-mods:passthru($node)
+      case element(fields) return to-mods:passthru($node, $path)
       case element(field) return (
         if ($node/@name = 'advisor1') then to-mods:advisor($node) else
         if ($node/@name = 'advisor2') then to-mods:committee-mem($node) else ()
       )
       case element(title) return to-mods:title($node)
-      case element(disciplines) return to-mods:passthru($node)
+      case element(disciplines) return to-mods:passthru($node, $path)
       case element(discipline) return to-mods:discipline($node)
       case element(abstract) return to-mods:abstract($node)
 
-      default return to-mods:passthru($node)
+      default return to-mods:passthru($node, $path)
 };
 
 (:~
  : passthru function 
  :)
-declare function to-mods:passthru( $node as node()* ) as item()* {
-  to-mods:dispatch($node/node())
+declare function to-mods:passthru(
+  $node as node()*,
+  $path as item()*
+) as item()* {
+  to-mods:dispatch($node/node(), $path)
 };
 
 (:~
  : begin the MODS serialization process
  : @param $node processes the 'document' node
  :)
-declare function to-mods:document( $node as node()* ) as item()* {
+declare function to-mods:document(
+  $node as node()*,
+  $path as item()*
+) as item()* {
   <mods:mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" version="3.5" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:etd="http://www.ndltd.org/standards/etdms/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-5.xsd">
-    {to-mods:dispatch($node/node())}
+    {to-mods:dispatch($node/node(), $path)}
     <mods:originInfo>
       {to-mods:sub-date($node)}
       {to-mods:pub-date($node)}
@@ -58,9 +67,11 @@ declare function to-mods:document( $node as node()* ) as item()* {
     <mods:typeOfResource>text</mods:typeOfResource>
     {to-mods:extension($node)}
     {to-mods:genre($node)}
+    {to-mods:series($node)}
     {to-mods:keywords($node)}
     {to-mods:comments($node)}
     {to-mods:access-condition($node)}
+    {to-mods:related-items($node, $path)}
   </mods:mods>
 };
 
@@ -182,4 +193,43 @@ declare function to-mods:access-condition( $node as node()* ) as element()* {
     ) else (
         <mods:accessCondition type="restriction on access">{"This item may not be viewed until: " || $embargo-xsdate}</mods:accessCondition>
     )
+};
+
+declare function to-mods:series( $node as node()* ) as element()* {
+  <mods:relatedItem type="series">
+    <mods:titleInfo lang="eng">
+      <mods:title>Graduate Theses and Dissertations</mods:title>
+    </mods:titleInfo>
+  </mods:relatedItem>
+};
+
+declare function to-mods:related-items(
+  $node as node()*,
+  $path as item()?
+) as element()* {
+  let $suppl-archive-name := $node/supplemental-files/file/archive-name/text()
+  let $file-list := file:list($path)
+  for $file in ($file-list)
+  let $f := if (fn:starts-with($file, '^\d{1,}-'))
+            then (fn:replace($file, '^\d{1,}-', ''))
+            else ()
+  where ($f = ($suppl-archive-name))
+  group by $f
+  count $count
+  return
+    <mods:relatedItem type="constituent">
+      <mods:titleInfo><mods:title>{$suppl-archive-name}</mods:title></mods:titleInfo>
+      <mods:physicalDescription>
+        <mods:internetMediaType>
+          {if ($suppl-archive-name)
+           then ($node/supplemental-files/file/archive-name[. = $f]/following-sibling::mime-type/text())
+           else (fetch:content-type($path || $f))}
+        </mods:internetMediaType>
+        {if ($node/supplemental-files/file/archive-name[. = $f]/following-sibling::description)
+         then (
+            <mods:abstract>{$node/supplemental-files/file/archive-name[. = $f]/following-sibling::description/text()}</mods:abstract>
+          ) else ()}
+      </mods:physicalDescription>
+      <mods:note displayLabel="supplemental_file">{"SUPPL_" || $count}</mods:note>
+    </mods:relatedItem>
 };
