@@ -58,6 +58,9 @@ declare function to-mods:document( $node as node()* ) as item()* {
     <mods:typeOfResource>text</mods:typeOfResource>
     {to-mods:extension($node)}
     {to-mods:genre($node)}
+    {to-mods:keywords($node)}
+    {to-mods:comments($node)}
+    {to-mods:access-condition($node)}
   </mods:mods>
 };
 
@@ -148,4 +151,35 @@ declare function to-mods:genre( $node as node()* ) as element()* {
       then (
         <mods:genre authority="coar" valueURI="http://purl.org/coar/resource_type/c_bdcc">masters thesis</mods:genre>
       ) else ()
+};
+
+declare function to-mods:keywords( $node as node()* ) as element()* {
+  <mods:note displayLabel="Keywords submitted by author">{fn:string-join( ($node/keywords//keyword/text()), ', ')}</mods:note>
+};
+
+declare function to-mods:comments( $node as node()* ) as element()* {
+  if ($node/fields/field[@name='comments'])
+  then (
+    <mods:note displayLabel="Submitted Comment">{$node/fields/field[@name='comments']/value/text()}</mods:note>
+  ) else ()
+};
+
+declare function to-mods:access-condition( $node as node()* ) as element()* {
+  let $embargo-xsdate := if ($node/fields/field[@name='embargo_date'])
+                         then (xs:dateTime($node/fields/field[@name='embargo_date']/value/text()))
+                         else ()
+  let $pub-xsdate := xs:dateTime($node/publication-date/text())
+  return
+    if (
+      ($embargo-xsdate <= $pub-xsdate) or
+      ($embargo-xsdate = xs:dateTime('2011-12-01T00:00:00-08:00')) or
+      ($embargo-xsdate = xs:dateTime('2011-12-01T00:00:00-08:00')) or
+      (fn:not(xs:string($embargo-xsdate)))
+    ) then ()
+    else if (($embargo-xsdate > $pub-xsdate) and ($embargo-xsdate < xs:dateTime($to-mods:c-date)))
+    then (
+        <mods:note displayLabel="Historical embargo date">{$embargo-xsdate}</mods:note>
+    ) else (
+        <mods:accessCondition type="restriction on access">{"This item may not be viewed until: " || $embargo-xsdate}</mods:accessCondition>
+    )
 };
