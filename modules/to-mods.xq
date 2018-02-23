@@ -16,7 +16,7 @@ declare variable $to-mods:c-date := fn:format-dateTime(fn:current-dateTime(), '[
  :)
 declare function to-mods:dispatch(
   $nodes as node()*,
-  $path as item()*
+  $path as item()?
 ) as item()* {
   for $node in $nodes
   return
@@ -45,7 +45,7 @@ declare function to-mods:dispatch(
  :)
 declare function to-mods:passthru(
   $node as node()*,
-  $path as item()*
+  $path as item()?
 ) as item()* {
   to-mods:dispatch($node/node(), $path)
 };
@@ -56,7 +56,7 @@ declare function to-mods:passthru(
  :)
 declare function to-mods:document(
   $node as node()*,
-  $path as item()*
+  $path as item()?
 ) as item()* {
   <mods:mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" version="3.5" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:etd="http://www.ndltd.org/standards/etdms/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-5.xsd">
     {to-mods:dispatch($node/node(), $path)}
@@ -72,6 +72,8 @@ declare function to-mods:document(
     {to-mods:comments($node)}
     {to-mods:access-condition($node)}
     {to-mods:related-items($node, $path)}
+    {to-mods:record-info($node)}
+    {to-mods:withdrawn($node)}
   </mods:mods>
 };
 
@@ -209,16 +211,15 @@ declare function to-mods:related-items(
 ) as element()* {
   let $suppl-archive-name := $node/supplemental-files/file/archive-name/text()
   let $file-list := file:list($path)
-  for $file in ($file-list)
-  let $f := if (fn:starts-with($file, '^\d{1,}-'))
-            then (fn:replace($file, '^\d{1,}-', ''))
-            else ()
+  for $file in functx:sort($file-list)
+  let $f := if (fn:matches($file, '^\d{1,}-'))
+             then (fn:replace($file, '^\d{1,}-', ''))
+             else ()
   where ($f = ($suppl-archive-name))
-  group by $f
   count $count
-  return
+  return (
     <mods:relatedItem type="constituent">
-      <mods:titleInfo><mods:title>{$suppl-archive-name}</mods:title></mods:titleInfo>
+      <mods:titleInfo><mods:title>{$f}</mods:title></mods:titleInfo>
       <mods:physicalDescription>
         <mods:internetMediaType>
           {if ($suppl-archive-name)
@@ -232,4 +233,23 @@ declare function to-mods:related-items(
       </mods:physicalDescription>
       <mods:note displayLabel="supplemental_file">{"SUPPL_" || $count}</mods:note>
     </mods:relatedItem>
+  )
+};
+
+declare function to-mods:record-info( $node as node()* ) as element()* {
+  <mods:recordInfo displayLabel="Submission">
+    <mods:recordCreationDate encoding="w3cdtf">{$node/submission-date/text()}</mods:recordCreationDate>
+    <mods:recordContentSource>University of Tennessee, Knoxville Libraries</mods:recordContentSource>
+    <mods:recordOrigin>Converted from bepress XML to MODS v3.5 in general compliance with the MODS Guidelines (Version 3.5).</mods:recordOrigin>
+    <mods:recordChangeDate encoding="w3cdtf">{$to-mods:c-date}</mods:recordChangeDate>
+  </mods:recordInfo>
+};
+
+declare function to-mods:withdrawn( $node as node()* ) as element()* {
+  if ($node/withdrawn/text())
+  then (
+    <mods:recordInfo displayLabel="Withdrawn">
+      <mods:recordChangeDate keyDate="yes">{$node/withdrawn/text()}</mods:recordChangeDate>
+    </mods:recordInfo>
+  ) else ()
 };
