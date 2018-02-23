@@ -89,7 +89,7 @@ declare function to-mods:author( $node as node()* ) as element()* {
     <mods:namePart type="family">{$node/lname/text()}</mods:namePart>
     {if ($node/terms) then <mods:namePart type="terms of address">{$node/terms/text()}</mods:namePart> else ()}
     <mods:role>
-      <mods:roleTerm type="text" authority="marcrelator" valueURI="http://id.loc.gov/vocbulary/relators/aut">Author</mods:roleTerm>
+      <mods:roleTerm type="text" authority="marcrelator" valueURI="http://id.loc.gov/vocabulary/relators/aut">Author</mods:roleTerm>
     </mods:role>
   </mods:name>
 };
