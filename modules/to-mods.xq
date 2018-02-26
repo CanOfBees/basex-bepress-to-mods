@@ -226,11 +226,11 @@ declare function to-mods:related-items(
            then ($node/supplemental-files/file/archive-name[. = $f]/following-sibling::mime-type/text())
            else (fetch:content-type($path || $f))}
         </mods:internetMediaType>
-        {if ($node/supplemental-files/file/archive-name[. = $f]/following-sibling::description)
-         then (
-            <mods:abstract>{$node/supplemental-files/file/archive-name[. = $f]/following-sibling::description/text()}</mods:abstract>
-          ) else ()}
       </mods:physicalDescription>
+      {if ($node/supplemental-files/file/archive-name[. = $f]/following-sibling::description)
+      then (
+          <mods:abstract>{$node/supplemental-files/file/archive-name[. = $f]/following-sibling::description/text()}</mods:abstract>
+        ) else ()}
       <mods:note displayLabel="supplemental_file">{"SUPPL_" || $count}</mods:note>
     </mods:relatedItem>
   )
